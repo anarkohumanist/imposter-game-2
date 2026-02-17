@@ -41,26 +41,93 @@ function App(){
     const[hg,setHg]=useState(false);
     const[loading,setLoading]=useState(false);
     const rr=useRef(null);
+    const pnRef=useRef(pn);
+    const ihRef=useRef(ih);
+    const scRef=useRef(sc);
+    useEffect(()=>{pnRef.current=pn},[pn]);
+    useEffect(()=>{ihRef.current=ih},[ih]);
+    useEffect(()=>{scRef.current=sc},[sc]);
 
     useEffect(()=>{
         if(!rc||!database)return;
         rr.current=database.ref(`rooms/${rc}`);
         const l=rr.current.on('value',snap=>{
             const d=snap.val();
-            if(d){
-                setRm(d);
-                if(d.gameState==='playing'&&s!=='game'){
-                    const mp=d.players?.find(p=>p.name===pn);
-                    if(mp){setMr(mp.role);setS('game')}
-                }else if(d.gameState==='results'&&s!=='results'){
-                    setS('results')
-                }else if(d.gameState==='lobby'&&s==='results'){
-                    setMr(null);setHg(false);setG('');setSc(null);setS('lobby')
+            if(!d)return;
+            setRm(d);
+
+            // Oyun başladı → game ekranına geç
+            if(d.gameState==='playing'){
+                const mp=d.players?.find(p=>p.name===pnRef.current);
+                if(mp){
+                    setMr(mp.role);
+                    setS(prev=>prev!=='game'?'game':prev);
                 }
+                // Tüm crewmate'ler oy verdiyse sonucu hesapla (sadece host)
+                if(ihRef.current){
+                    const cms=d.players?.filter(p=>p.role==='crewmate')||[];
+                    const allVoted=cms.length>0&&cms.every(p=>p.guess!==null&&p.guess!==undefined);
+                    if(allVoted){
+                        calcResults(d);
+                    }
+                }
+            }
+
+            // Sonuçlar hazır → herkes results ekranına geçsin
+            if(d.gameState==='results'){
+                setS('results');
+            }
+
+            // Yeni tur → lobby'ye dön
+            if(d.gameState==='lobby'){
+                setS(prev=>{
+                    if(prev==='results'||prev==='game'){
+                        setMr(null);
+                        setHg(false);
+                        setG('');
+                        setSc(null);
+                        return 'lobby';
+                    }
+                    return prev;
+                });
             }
         });
         return()=>{if(rr.current)rr.current.off('value',l)}
-    },[rc,pn,s]);
+    },[rc]);
+
+    const calcResults=async(currentRoom)=>{
+        // Zaten hesaplanmışsa tekrar hesaplama
+        if(currentRoom.gameState==='results')return;
+        const imp=currentRoom.players.find(p=>p.role==='impostor');
+        const cms=currentRoom.players.filter(p=>p.role==='crewmate');
+        const cg=[];
+        const up=[...currentRoom.players];
+        cms.forEach(pl=>{
+            const pi=up.findIndex(p=>p.name===pl.name);
+            if(imp.name.toLowerCase()===pl.guess?.toLowerCase()){
+                cg.push(pl.name);
+                up[pi].points+=2;
+            }
+        });
+        let w;
+        if(cg.length===0){
+            const ii=up.findIndex(p=>p.role==='impostor');
+            up[ii].points+=3;
+            cms.forEach(c=>{
+                const i=up.findIndex(p=>p.name===c.name);
+                up[i].points-=1;
+            });
+            w='impostor';
+        }else{w='crewmate'}
+        try{
+            await database.ref(`rooms/${rc}`).update({
+                players:up,
+                correctGuessers:cg,
+                winner:w,
+                gameState:'results'
+            });
+        }catch(e){console.error(e)}
+    };
 
     const cr=async()=>{
         if(!in1.trim()||!database)return;
@@ -94,45 +161,28 @@ function App(){
         const sh=[...rm.players].sort(()=>Math.random()-.5);
         sh.forEach((p,i)=>{p.role=i===0?'impostor':'crewmate';p.guess=null});
         const w=CAT[sc].words[Math.floor(Math.random()*CAT[sc].words.length)];
-        await database.ref(`rooms/${rc}`).set({...rm,players:sh,gameState:'playing',category:sc,selectedWord:w});
+        await database.ref(`rooms/${rc}`).set({...rm,players:sh,gameState:'playing',category:sc,selectedWord:w,winner:null,correctGuessers:null});
     };
 
     const sub=async()=>{
-        if(!g.trim()||hg)return;
+        if(!g.trim()||hg||!database)return;
         const idx=rm.players.findIndex(p=>p.name===pn);
         if(idx===-1||rm.players[idx].role==='impostor')return;
         await database.ref(`rooms/${rc}/players/${idx}/guess`).set(g.trim());
         setHg(true);
-        if(ih){
-            setTimeout(async()=>{
-                const snap=await database.ref(`rooms/${rc}`).once('value');
-                const cur=snap.val();
-                const cms=cur.players.filter(p=>p.role==='crewmate');
-                if(cms.every(p=>p.guess)){
-                    const imp=cur.players.find(p=>p.role==='impostor');
-                    const cg=[];
-                    const up=[...cur.players];
-                    cms.forEach(pl=>{
-                        const pi=up.findIndex(p=>p.name===pl.name);
-                        if(imp.name.toLowerCase()===pl.guess?.toLowerCase()){cg.push(pl.name);up[pi].points+=2;}
-                    });
-                    let w;
-                    if(cg.length===0){
-                        const ii=up.findIndex(p=>p.role==='impostor');
-                        up[ii].points+=3;
-                        cms.forEach(c=>{const i=up.findIndex(p=>p.name===c.name);up[i].points-=1;});
-                        w='impostor';
-                    }else{w='crewmate'}
-                    await database.ref(`rooms/${rc}`).update({players:up,correctGuessers:cg,winner:w,gameState:'results'});
-                }
-            },500)
-        }
     };
 
     const nr=async()=>{
-        if(!ih)return;
+        if(!ih||!database)return;
         const up=rm.players.map(p=>({...p,role:null,guess:null}));
-        await database.ref(`rooms/${rc}`).update({gameState:'lobby',players:up,category:null,selectedWord:null,winner:null});
+        await database.ref(`rooms/${rc}`).update({
+            gameState:'lobby',
+            players:up,
+            category:null,
+            selectedWord:null,
+            winner:null,
+            correctGuessers:null
+        });
     };
 
     const st={
@@ -209,7 +259,7 @@ function App(){
 
     if(s==='game'){
         const cms=rm?.players?.filter(p=>p.role==='crewmate')||[];
-        const gc=cms.filter(p=>p.guess!==null).length;
+        const gc=cms.filter(p=>p.guess!==null&&p.guess!==undefined).length;
         return(
             <div style={st.page}>
                 <div style={{maxWidth:'600px',margin:'0 auto'}}>
@@ -219,7 +269,6 @@ function App(){
                         <div style={{fontSize:'56px',fontWeight:'900',color:mr==='impostor'?'rgb(239,68,68)':'rgb(96,165,250)',marginBottom:'15px'}}>
                             {mr==='impostor'?'🎭 İMPOSTOR':'✅ TEMİZ'}
                         </div>
-                        {/* TEMİZ → KELİMEYİ GÖRÜR */}
                         {mr==='crewmate'&&rm?.selectedWord&&(
                             <div>
                                 <p style={st.label}>Kategori Kelimesi</p>
@@ -229,7 +278,6 @@ function App(){
                                 <p style={{color:'rgba(255,255,255,0.4)',fontSize:'11px',margin:0}}>İmpostor bu kelimeyi bilmiyor!</p>
                             </div>
                         )}
-                        {/* İMPOSTOR → KELİMEYİ GÖRMEZ */}
                         {mr==='impostor'&&(
                             <div style={{background:'rgba(239,68,68,0.15)',border:'2px solid rgba(239,68,68,0.4)',borderRadius:'12px',padding:'15px'}}>
                                 <p style={{color:'rgba(255,255,255,0.7)',fontSize:'14px',margin:'0 0 4px 0'}}>⚠️ Kategori kelimesini bilmiyorsun!</p>
@@ -238,7 +286,7 @@ function App(){
                         )}
                     </div>
 
-                    {/* TEMİZ OYUNCU → TAHMİN KUTUSU */}
+                    {/* TEMİZ → TAHMİN */}
                     {mr==='crewmate'&&(
                         <div style={{...st.card,marginBottom:'15px'}}>
                             <h3 style={{...st.white,margin:'0 0 15px 0'}}>🔍 İmpostoru Tahmin Et</h3>
@@ -251,6 +299,7 @@ function App(){
                                 <div style={{background:'rgba(34,197,94,0.15)',border:'2px solid rgba(34,197,94,0.4)',borderRadius:'10px',padding:'15px',textAlign:'center'}}>
                                     <p style={{color:'rgb(134,239,172)',fontWeight:'600',fontSize:'16px',margin:'0 0 6px 0'}}>✓ Tahmininiz gönderildi!</p>
                                     <p style={{color:'rgba(255,255,255,0.7)',margin:0}}>"{g}"</p>
+                                    <p style={{color:'rgba(255,255,255,0.4)',fontSize:'12px',margin:'8px 0 0 0'}} className="pulse">⏳ Diğerleri bekleniyor...</p>
                                 </div>
                             )}
                         </div>
@@ -263,7 +312,7 @@ function App(){
                         </div>
                     )}
 
-                    {/* OYLAMA TABLOSU - SADECE İSİMLER, HİÇBİR DURUM BİLGİSİ YOK! */}
+                    {/* OYUNCU LİSTESİ - SADECE İSİMLER */}
                     <div style={st.card}>
                         <h3 style={{...st.white,margin:'0 0 5px 0'}}>👥 Oyuncular</h3>
                         <p style={{color:'rgba(255,255,255,0.4)',fontSize:'12px',margin:'0 0 12px 0'}}>
@@ -272,22 +321,15 @@ function App(){
                         <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                             {rm?.players?.map((p,i)=>{
                                 const isMe=p.name===pn;
-                                // SADECE KENDİ OY DURUMUNU GÖSTER - başkaların durumu gizli!
                                 const showMyStatus=isMe&&p.role==='crewmate';
                                 return(
                                     <div key={i} style={{
                                         background:isMe?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.15)',
-                                        borderRadius:'10px',
-                                        padding:'12px 15px',
-                                        display:'flex',
-                                        alignItems:'center',
-                                        justifyContent:'space-between',
+                                        borderRadius:'10px',padding:'12px 15px',
+                                        display:'flex',alignItems:'center',justifyContent:'space-between',
                                         border:isMe?'1px solid rgba(255,255,255,0.4)':'none'
                                     }}>
-                                        <span style={{color:'white',fontWeight:'600'}}>
-                                            {p.name}{isMe?' (Sen)':''}
-                                        </span>
-                                        {/* SADECE KENDİ DURUMUNU GÖSTER */}
+                                        <span style={{color:'white',fontWeight:'600'}}>{p.name}{isMe?' (Sen)':''}</span>
                                         {showMyStatus&&(
                                             hg
                                                 ?<span style={{fontSize:'12px',color:'rgb(74,222,128)'}}>✓ Gönderildi</span>
@@ -309,6 +351,7 @@ function App(){
         return(
             <div style={st.page}>
                 <div style={{maxWidth:'700px',margin:'0 auto'}}>
+                    {/* KAZANAN */}
                     <div style={{...st.card,textAlign:'center',marginBottom:'15px'}}>
                         <h2 style={{fontSize:'28px',fontWeight:'bold',color:'white',margin:'0 0 12px 0'}}>🏆 Sonuçlar</h2>
                         <div style={{fontSize:'38px',fontWeight:'900',color:rm?.winner==='impostor'?'rgb(239,68,68)':'rgb(74,222,128)',marginBottom:'15px'}}>
@@ -325,6 +368,8 @@ function App(){
                             <span style={{background:'rgb(239,68,68)',padding:'8px 20px',borderRadius:'20px',color:'white',fontWeight:'bold',fontSize:'16px'}}>🎭 {imp?.name}</span>
                         </div>
                     </div>
+
+                    {/* DOĞRU TAHMİN EDENLER */}
                     {rm?.correctGuessers&&rm.correctGuessers.length>0&&(
                         <div style={{background:'rgba(34,197,94,0.15)',border:'2px solid rgba(34,197,94,0.4)',borderRadius:'15px',padding:'18px',marginBottom:'15px'}}>
                             <h3 style={{color:'rgb(134,239,172)',margin:'0 0 10px 0',fontSize:'16px'}}>🎯 Doğru Tahmin Edenler (+2 puan):</h3>
@@ -335,6 +380,8 @@ function App(){
                             </div>
                         </div>
                     )}
+
+                    {/* SKOR TABLOSU */}
                     <div style={{...st.card,marginBottom:'15px'}}>
                         <h3 style={{...st.white,margin:'0 0 12px 0',fontSize:'20px'}}>🏅 Skor Tablosu</h3>
                         <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
@@ -342,7 +389,7 @@ function App(){
                                 <div key={i} style={{borderRadius:'10px',padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',background:i===0?'rgba(234,179,8,0.3)':i===1?'rgba(156,163,175,0.2)':i===2?'rgba(249,115,22,0.2)':'rgba(255,255,255,0.15)',border:i===0?'2px solid rgb(234,179,8)':i===1?'1px solid rgb(209,213,219)':i===2?'1px solid rgb(249,115,22)':'none'}}>
                                     <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
                                         <span style={{fontSize:'20px'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`}</span>
-                                        <span style={{color:'white',fontWeight:'bold'}}>{p.name}</span>
+                                        <span style={{color:'white',fontWeight:'bold'}}>{p.name}{p.name===pn?' (Sen)':''}</span>
                                         {p.role==='impostor'&&<span style={{background:'rgba(239,68,68,0.5)',padding:'2px 8px',borderRadius:'8px',color:'white',fontSize:'11px'}}>İmpostor</span>}
                                     </div>
                                     <span style={{fontSize:'20px',fontWeight:'bold',color:'rgb(253,224,71)'}}>{p.points}</span>
@@ -350,7 +397,17 @@ function App(){
                             ))}
                         </div>
                     </div>
-                    {ih&&<button onClick={nr} style={st.btn('linear-gradient(90deg,rgb(59,130,246),rgb(6,182,212))',false)}>🔄 Yeni Tur</button>}
+
+                    {/* YENİ TUR - SADECE HOST GÖREBİLİR */}
+                    {ih?(
+                        <button onClick={nr} style={st.btn('linear-gradient(90deg,rgb(59,130,246),rgb(6,182,212))',false)}>
+                            🔄 Yeni Tur Başlat
+                        </button>
+                    ):(
+                        <div style={{...st.card,textAlign:'center'}}>
+                            <p style={{color:'rgba(255,255,255,0.6)',margin:0}} className="pulse">⏳ Oda sahibinin yeni tur başlatması bekleniyor...</p>
+                        </div>
+                    )}
                 </div>
             </div>
         )
