@@ -213,11 +213,13 @@ function App(){
         return(
             <div style={st.page}>
                 <div style={{maxWidth:'600px',margin:'0 auto'}}>
+                    {/* ROL KARTI */}
                     <div style={{...st.card,textAlign:'center',marginBottom:'15px'}}>
                         <p style={{...st.label,marginBottom:'10px'}}>Senin Rolün</p>
                         <div style={{fontSize:'56px',fontWeight:'900',color:mr==='impostor'?'rgb(239,68,68)':'rgb(96,165,250)',marginBottom:'15px'}}>
                             {mr==='impostor'?'🎭 İMPOSTOR':'✅ TEMİZ'}
                         </div>
+                        {/* TEMİZ → KELİMEYİ GÖRÜR */}
                         {mr==='crewmate'&&rm?.selectedWord&&(
                             <div>
                                 <p style={st.label}>Kategori Kelimesi</p>
@@ -227,6 +229,7 @@ function App(){
                                 <p style={{color:'rgba(255,255,255,0.4)',fontSize:'11px',margin:0}}>İmpostor bu kelimeyi bilmiyor!</p>
                             </div>
                         )}
+                        {/* İMPOSTOR → KELİMEYİ GÖRMEZ */}
                         {mr==='impostor'&&(
                             <div style={{background:'rgba(239,68,68,0.15)',border:'2px solid rgba(239,68,68,0.4)',borderRadius:'12px',padding:'15px'}}>
                                 <p style={{color:'rgba(255,255,255,0.7)',fontSize:'14px',margin:'0 0 4px 0'}}>⚠️ Kategori kelimesini bilmiyorsun!</p>
@@ -234,6 +237,8 @@ function App(){
                             </div>
                         )}
                     </div>
+
+                    {/* TEMİZ OYUNCU → TAHMİN KUTUSU */}
                     {mr==='crewmate'&&(
                         <div style={{...st.card,marginBottom:'15px'}}>
                             <h3 style={{...st.white,margin:'0 0 15px 0'}}>🔍 İmpostoru Tahmin Et</h3>
@@ -250,24 +255,44 @@ function App(){
                             )}
                         </div>
                     )}
+
+                    {/* İMPOSTOR → BEKLİYOR */}
                     {mr==='impostor'&&(
                         <div style={{...st.card,marginBottom:'15px',textAlign:'center'}}>
                             <p style={{color:'rgba(255,255,255,0.6)',margin:0}} className="pulse">⏳ Diğer oyuncuların tahmin etmesi bekleniyor...</p>
                         </div>
                     )}
+
+                    {/* OYLAMA TABLOSU - SADECE İSİMLER, HİÇBİR DURUM BİLGİSİ YOK! */}
                     <div style={st.card}>
-                        <h3 style={{...st.white,margin:'0 0 12px 0'}}>📊 Oylama ({gc}/{cms.length})</h3>
+                        <h3 style={{...st.white,margin:'0 0 5px 0'}}>👥 Oyuncular</h3>
+                        <p style={{color:'rgba(255,255,255,0.4)',fontSize:'12px',margin:'0 0 12px 0'}}>
+                            {gc}/{cms.length} kişi tahminini gönderdi
+                        </p>
                         <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                             {rm?.players?.map((p,i)=>{
                                 const isMe=p.name===pn;
-                                const voted=p.role==='crewmate'&&p.guess!==null;
+                                // SADECE KENDİ OY DURUMUNU GÖSTER - başkaların durumu gizli!
+                                const showMyStatus=isMe&&p.role==='crewmate';
                                 return(
-                                    <div key={i} style={{background:isMe?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.15)',borderRadius:'10px',padding:'12px 15px',display:'flex',alignItems:'center',justifyContent:'space-between',border:isMe?'1px solid rgba(255,255,255,0.4)':'none'}}>
-                                        <span style={{color:'white',fontWeight:'600'}}>{p.name}{isMe?' (Sen)':''}</span>
-                                        {voted
-                                            ?<span style={{fontSize:'13px',color:'rgb(74,222,128)'}}>✓ Oy verdi</span>
-                                            :<span style={{fontSize:'13px',color:'rgb(250,204,21)'}} className="pulse">⏳ Bekliyor</span>
-                                        }
+                                    <div key={i} style={{
+                                        background:isMe?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.15)',
+                                        borderRadius:'10px',
+                                        padding:'12px 15px',
+                                        display:'flex',
+                                        alignItems:'center',
+                                        justifyContent:'space-between',
+                                        border:isMe?'1px solid rgba(255,255,255,0.4)':'none'
+                                    }}>
+                                        <span style={{color:'white',fontWeight:'600'}}>
+                                            {p.name}{isMe?' (Sen)':''}
+                                        </span>
+                                        {/* SADECE KENDİ DURUMUNU GÖSTER */}
+                                        {showMyStatus&&(
+                                            hg
+                                                ?<span style={{fontSize:'12px',color:'rgb(74,222,128)'}}>✓ Gönderildi</span>
+                                                :<span style={{fontSize:'12px',color:'rgb(250,204,21)'}} className="pulse">⏳ Tahmin et</span>
+                                        )}
                                     </div>
                                 )
                             })}
