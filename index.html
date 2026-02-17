@@ -17,14 +17,14 @@ try{
 }catch(e){console.error(e)}
 
 const CAT={
-    karisik:{name:"🎬 karisik",words:["Inception","Titanik","Avatar","Harry Potter","Star Wars","Matrix","Breaking Bad","Friends","Squid Game","Wednesday","The Last of Us","Dark","Peaky Blinders","Amerika","İngiltere","Fransa","Almanya","İtalya","Japonya","Brezilya","Avustralya","Kanada","İspanya","Çin","Lamborghini","Porsche","Mercedes","BMW","Audi","Tesla","Toyota","Ford","Bugatti","Rolls Royce","McLaren","Sanal Pos","retry","3D Secure","Pricing","elazig"]},
+    karisik:{name:"🎲 Karışık",words:["Inception","Titanik","Avatar","Harry Potter","Star Wars","Matrix","Breaking Bad","Friends","Squid Game","Wednesday","The Last of Us","Dark","Peaky Blinders","Amerika","İngiltere","Fransa","Almanya","İtalya","Japonya","Brezilya","Avustralya","Kanada","İspanya","Çin","Lamborghini","Porsche","Mercedes","BMW","Audi","Tesla","Toyota","Ford","Bugatti","Rolls Royce","McLaren","Sanal Pos","retry","3D Secure","Pricing","elazig"]},
     music:{name:"🎵 Müzik",words:["Tarkan","Sezen Aksu","Beyonce","Taylor Swift","Ed Sheeran","Adele","Drake","Queen","Beatles","Coldplay","Billie Eilish","Rihanna","Eminem"]},
     sports:{name:"⚽ Spor",words:["Messi","Ronaldo","Neymar","Mbappe","Haaland","Galatasaray","Fenerbahçe","Beşiktaş","Barcelona","Real Madrid","Liverpool","Bayern Munich"]},
     games:{name:"🎮 Oyunlar",words:["Minecraft","Fortnite","Among Us","FIFA","GTA","Valorant","PUBG","League of Legends","Pokemon","Mario","Zelda","Roblox"]},
     food:{name:"🍔 Yemek",words:["Pizza","Burger","Kebap","Sushi","Pasta","Baklava","Döner","Mantı","Börek","Lahmacun","Künefe","Ramen"]},
     animals:{name:"🐾 Hayvanlar",words:["Aslan","Kaplan","Fil","Zürafa","Köpek","Kedi","Yunus","Balina","Panda","Koala","Kanguru","Kurt"]},
     tech:{name:"📱 Teknoloji",words:["Apple","Samsung","Google","Microsoft","iPhone","PlayStation","Xbox","Netflix","Spotify","Tesla","TikTok","Instagram"]},
-    celebrities:{name:"🎭 Ünlüler",words:["Tarkan","Kenan İmirzalıoğlu","Kıvanç Tatlıtuğ","Leonardo DiCaprio","Brad Pitt","Tom Cruise","Will Smith","Dwayne Johnson","Ryan Reynolds","Zendaya","Margot Robbie","Scarlett Johansson"]},
+    celebrities:{name:"🎭 Ünlüler",words:["Tarkan","Kenan İmirzalıoğlu","Kıvanç Tatlıtuğ","Leonardo DiCaprio","Brad Pitt","Tom Cruise","Will Smith","Dwayne Johnson","Ryan Reynolds","Zendaya","Margot Robbie","Scarlett Johansson"]}
 };
 
 function App(){
@@ -208,19 +208,16 @@ function App(){
     )}
 
     if(s==='game'){
-        // KENDİ ROLÜNE GÖRE GÖSTER - DİĞERLERİNİN ROLÜ GİZLİ!
         const cms=rm?.players?.filter(p=>p.role==='crewmate')||[];
         const gc=cms.filter(p=>p.guess!==null).length;
         return(
             <div style={st.page}>
                 <div style={{maxWidth:'600px',margin:'0 auto'}}>
-                    {/* ROL KARTI */}
                     <div style={{...st.card,textAlign:'center',marginBottom:'15px'}}>
                         <p style={{...st.label,marginBottom:'10px'}}>Senin Rolün</p>
                         <div style={{fontSize:'56px',fontWeight:'900',color:mr==='impostor'?'rgb(239,68,68)':'rgb(96,165,250)',marginBottom:'15px'}}>
                             {mr==='impostor'?'🎭 İMPOSTOR':'✅ TEMİZ'}
                         </div>
-                        {/* TEMİZ → KELİMEYİ GÖRÜR */}
                         {mr==='crewmate'&&rm?.selectedWord&&(
                             <div>
                                 <p style={st.label}>Kategori Kelimesi</p>
@@ -230,7 +227,6 @@ function App(){
                                 <p style={{color:'rgba(255,255,255,0.4)',fontSize:'11px',margin:0}}>İmpostor bu kelimeyi bilmiyor!</p>
                             </div>
                         )}
-                        {/* İMPOSTOR → KELİMEYİ GÖRMEZ */}
                         {mr==='impostor'&&(
                             <div style={{background:'rgba(239,68,68,0.15)',border:'2px solid rgba(239,68,68,0.4)',borderRadius:'12px',padding:'15px'}}>
                                 <p style={{color:'rgba(255,255,255,0.7)',fontSize:'14px',margin:'0 0 4px 0'}}>⚠️ Kategori kelimesini bilmiyorsun!</p>
@@ -238,8 +234,6 @@ function App(){
                             </div>
                         )}
                     </div>
-
-                    {/* TEMİZ OYUNCU → TAHMİN KUTUSU */}
                     {mr==='crewmate'&&(
                         <div style={{...st.card,marginBottom:'15px'}}>
                             <h3 style={{...st.white,margin:'0 0 15px 0'}}>🔍 İmpostoru Tahmin Et</h3>
@@ -256,29 +250,24 @@ function App(){
                             )}
                         </div>
                     )}
-
-                    {/* İMPOSTOR → BEKLİYOR MESAJI */}
                     {mr==='impostor'&&(
                         <div style={{...st.card,marginBottom:'15px',textAlign:'center'}}>
                             <p style={{color:'rgba(255,255,255,0.6)',margin:0}} className="pulse">⏳ Diğer oyuncuların tahmin etmesi bekleniyor...</p>
                         </div>
                     )}
-
-                    {/* OYLAMA DURUMU - SADECE OY VERİP VERMEDİĞİ GÖRÜNECEk, ROL GİZLİ! */}
                     <div style={st.card}>
                         <h3 style={{...st.white,margin:'0 0 12px 0'}}>📊 Oylama ({gc}/{cms.length})</h3>
                         <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                             {rm?.players?.map((p,i)=>{
                                 const isMe=p.name===pn;
                                 const voted=p.role==='crewmate'&&p.guess!==null;
-                                const waiting=p.role==='crewmate'&&p.guess===null;
-                                const isImpostor=p.role==='impostor';
                                 return(
                                     <div key={i} style={{background:isMe?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.15)',borderRadius:'10px',padding:'12px 15px',display:'flex',alignItems:'center',justifyContent:'space-between',border:isMe?'1px solid rgba(255,255,255,0.4)':'none'}}>
                                         <span style={{color:'white',fontWeight:'600'}}>{p.name}{isMe?' (Sen)':''}</span>
-                                        {/* SADECE OY DURUMU GÖSTERİLİYOR - ROL GİZLİ! */}
-                                        {voted&&<span style={{fontSize:'13px',color:'rgb(74,222,128)'}}>✓ Oy verdi</span>}
-                                        {(waiting||isImpostor)&&<span style={{fontSize:'13px',color:'rgb(250,204,21)'}} className="pulse">⏳ Bekliyor</span>}
+                                        {voted
+                                            ?<span style={{fontSize:'13px',color:'rgb(74,222,128)'}}>✓ Oy verdi</span>
+                                            :<span style={{fontSize:'13px',color:'rgb(250,204,21)'}} className="pulse">⏳ Bekliyor</span>
+                                        }
                                     </div>
                                 )
                             })}
