@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Kim İmpostor?</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+*{-webkit-tap-highlight-color:transparent}
+body{margin:0;padding:0;overflow:hidden;position:fixed;width:100%;height:100%}
+#root{width:100%;height:100%;overflow-y:auto}
+input,button,select{font-size:16px!important}
+.pulse{animation:pulse 2s cubic-bezier(0.4,0,0.6,1) infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.ticker-wrap{overflow:hidden;background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.15);border-bottom:1px solid rgba(255,255,255,0.15);padding:8px 0;position:sticky;top:0;z-index:100}
+.ticker{display:flex;white-space:nowrap;animation:ticker 28s linear infinite}
+@keyframes ticker{0%{transform:translateX(100vw)}100%{transform:translateX(-100%)}}
+.ticker span{color:rgba(255,255,255,0.85);font-size:13px;padding:0 40px}
+.ticker span b{color:rgb(253,224,71)}
+</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useRef}=React;
+const firebaseConfig={
+    apiKey:"AIzaSyDiuOvT3TECVgnKpYSdcEadtcj0eirVLR4",
+    authDomain:"imposter-iyzc-is.firebaseapp.com",
+    databaseURL:"https://imposter-iyzc-is-default-rtdb.firebaseio.com",
+    projectId:"imposter-iyzc-is",
+    storageBucket:"imposter-iyzc-is.firebasestorage.app",
+    messagingSenderId:"434645266924",
+    appId:"1:434645266924:web:6e0f6fd9d49546cdf050c9"
+};
+let database;
+try{
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    database=firebase.database();
+}catch(e){console.error(e)}
+
+const CAT={
+    karisik:{name:"🎲 Karışık",words:["Inception","Titanik","Avatar","Harry Potter","Star Wars","Matrix","Breaking Bad","Friends","Squid Game","Wednesday","The Last of Us","Dark","Peaky Blinders","Amerika","İngiltere","Fransa","Almanya","İtalya","Japonya","Brezilya","Avustralya","Kanada","İspanya","Çin","Lamborghini","Porsche","Mercedes","BMW","Audi","Tesla","Toyota","Ford","Bugatti","Rolls Royce","McLaren","Sanal Pos","retry","3D Secure","Pricing","elazig"]},
+    music:{name:"🎵 Müzik",words:["Tarkan","Sezen Aksu","Beyonce","Taylor Swift","Ed Sheeran","Adele","Drake","Queen","Beatles","Coldplay","Billie Eilish","Rihanna","Eminem"]},
+    sports:{name:"⚽ Spor",words:["Messi","Ronaldo","Neymar","Mbappe","Haaland","Galatasaray","Fenerbahçe","Beşiktaş","Barcelona","Real Madrid","Liverpool","Bayern Munich"]},
+    games:{name:"🎮 Oyunlar",words:["Minecraft","Fortnite","Among Us","FIFA","GTA","Valorant","PUBG","League of Legends","Pokemon","Mario","Zelda","Roblox"]},
+    food:{name:"🍔 Yemek",words:["Pizza","Burger","Kebap","Sushi","Pasta","Baklava","Döner","Mantı","Börek","Lahmacun","Künefe","Ramen"]},
+    animals:{name:"🐾 Hayvanlar",words:["Aslan","Kaplan","Fil","Zürafa","Köpek","Kedi","Yunus","Balina","Panda","Koala","Kanguru","Kurt"]},
+    tech:{name:"📱 Teknoloji",words:["Apple","Samsung","Google","Microsoft","iPhone","PlayStation","Xbox","Netflix","Spotify","Tesla","TikTok","Instagram"]},
+    celebrities:{name:"🎭 Ünlüler",words:["Tarkan","Kenan İmirzalıoğlu","Kıvanç Tatlıtuğ","Leonardo DiCaprio","Brad Pitt","Tom Cruise","Will Smith","Dwayne Johnson","Ryan Reynolds","Zendaya","Margot Robbie","Scarlett Johansson"]}
+};
+
+// PUANLAMA SİSTEMİ
+const SCORE_RULES=[
+    {text:"Tek başına impostoru bulan",pts:"+5"},
+    {text:"İmpostoru birden fazla bulan",pts:"+2"},
+    {text:"İmpostor yakalanmazsa",pts:"+5"},
+    {text:"İmpostor yakalanırsa",pts:"-1"},
+    {text:"Yanlış tahmin eden",pts:"-2"},
+];
+
+function ScoreTicker(){
+    const items=[...SCORE_RULES,...SCORE_RULES];
+    return(
+        <div className="ticker-wrap">
+            <div className="ticker">
+                {items.map((r,i)=>(
+                    <span key={i}>🎯 {r.text}: <b>{r.pts} puan</b></span>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function App(){
+    const[s,setS]=useState('menu');
+    const[pn,setPn]=useState('');
+    const[rc,setRc]=useState('');
+    const[irc,setIrc]=useState('');
+    const[in1,setIn]=useState('');
+    const[rm,setRm]=useState(null);
+    const[ih,setIh]=useState(false);
+    const[sc,setSc]=useState(null);
+    const[mr,setMr]=useState(null);
+    const[g,setG]=useState('');
+    const[hg,setHg]=useState(false);
+    const[loading,setLoading]=useState(false);
+    const[impCount,setImpCount]=useState(1);
+    // Oyun ekranında oyuncuların random sıralı listesi (sadece görsel)
+    const[displayOrder,setDisplayOrder]=useState([]);
+    const rr=useRef(null);
+    const pnRef=useRef(pn);
+    const ihRef=useRef(ih);
+    const rcRef=useRef(rc);
+    useEffect(()=>{pnRef.current=pn},[pn]);
+    useEffect(()=>{ihRef.current=ih},[ih]);
+    useEffect(()=>{rcRef.current=rc},[rc]);
+
+    useEffect(()=>{
+        if(!rc||!database)return;
+        rr.current=database.ref(`rooms/${rc}`);
+        const l=rr.current.on('value',snap=>{
+            const d=snap.val();
+            if(!d)return;
+            setRm(d);
+            if(d.gameState==='playing'){
+                const mp=d.players?.find(p=>p.name===pnRef.current);
+                if(mp){
+                    setMr(mp.role);
+                    setS(prev=>{
+                        if(prev!=='game'){
+                            // Oyun başlarken oyuncu listesini karıştır (görsel için)
+                            const shuffled=[...(d.players||[])].sort(()=>Math.random()-0.5);
+                            setDisplayOrder(shuffled.map(p=>p.name));
+                            return 'game';
+                        }
+                        return prev;
+                    });
+                }
+                if(ihRef.current){
+                    const cms=d.players?.filter(p=>p.role==='crewmate')||[];
+                    const allVoted=cms.length>0&&cms.every(p=>p.guess!==null&&p.guess!==undefined);
+                    if(allVoted&&d.gameState==='playing'){
+                        calcResults(d,rcRef.current);
+                    }
+                }
+            }
+            if(d.gameState==='results'){
+                setS('results');
+            }
+            if(d.gameState==='lobby'){
+                setS(prev=>{
+                    if(prev==='results'||prev==='game'){
+                        setMr(null);setHg(false);setG('');setSc(null);setDisplayOrder([]);
+                        return 'lobby';
+                    }
+                    return prev;
+                });
+            }
+        });
+        return()=>{if(rr.current)rr.current.off('value',l)}
+    },[rc]);
+
+    // YENİ PUANLAMA SİSTEMİ
+    // Tek başına bulan: +5, Birden fazla bulan: +2
+    // İmpostor yakalanmazsa: +5 (her impostor), yakalanırsa: -1 (her impostor)
+    // Yanlış tahmin eden: -2
+    const calcResults=async(currentRoom, roomCode)=>{
+        if(currentRoom.gameState==='results')return;
+        const impostors=currentRoom.players.filter(p=>p.role==='impostor');
+        const cms=currentRoom.players.filter(p=>p.role==='crewmate');
+        const up=[...currentRoom.players];
+
+        // Her impostor için: kaç kişi doğru tahmin etti?
+        // Bir crewmate'in tahmini birden fazla impostoru kapsayabilmez, her oyuncu 1 tahmin yapar
+        // Doğru tahmin = impostorlardan herhangi birinin adını yazdı
+        const correctGuessers=[];
+        const wrongGuessers=[];
+
+        cms.forEach(pl=>{
+            const guessLower=pl.guess?.toLowerCase()||'';
+            const hitImp=impostors.find(imp=>imp.name.toLowerCase()===guessLower);
+            if(hitImp){
+                correctGuessers.push(pl.name);
+            } else {
+                wrongGuessers.push(pl.name);
+            }
+        });
+
+        // Puanlama
+        const solo=(correctGuessers.length===1); // tek başına mı buldu?
+        up.forEach((p,i)=>{
+            if(p.role==='crewmate'){
+                if(correctGuessers.includes(p.name)){
+                    up[i]={...p,points:p.points+(solo?5:2)};
+                } else {
+                    // Yanlış tahmin -2
+                    up[i]={...p,points:p.points-2};
+                }
+            }
+            if(p.role==='impostor'){
+                if(correctGuessers.length===0){
+                    // Yakalanmadı +5
+                    up[i]={...p,points:p.points+5};
+                } else {
+                    // Yakalandı -1
+                    up[i]={...p,points:p.points-1};
+                }
+            }
+        });
+
+        const winner=correctGuessers.length>0?'crewmate':'impostor';
+        try{
+            await database.ref(`rooms/${roomCode}`).update({
+                players:up,
+                correctGuessers,
+                wrongGuessers,
+                winner,
+                gameState:'results'
+            });
+        }catch(e){console.error(e)}
+    };
+
+    const cr=async()=>{
+        if(!in1.trim()||!database)return;
+        setLoading(true);
+        const c=Math.random().toString(36).substring(2,8).toUpperCase();
+        try{
+            await database.ref(`rooms/${c}`).set({
+                code:c,host:in1,
+                players:[{name:in1,points:0,role:null,guess:null}],
+                gameState:'lobby',currentRound:0,impCount:1
+            });
+            setRc(c);setPn(in1);setIh(true);setS('lobby');
+        }catch(e){alert("Hata!")}
+        setLoading(false);
+    };
+
+    const jr=async()=>{
+        if(!in1.trim()||!irc.trim()||!database)return;
+        setLoading(true);
+        const c=irc.toUpperCase();
+        try{
+            const rs=await database.ref(`rooms/${c}`).once('value');
+            const er=rs.val();
+            if(!er){alert("Oda bulunamadı!");setLoading(false);return}
+            if(er.players.some(p=>p.name===in1)){alert("Bu isim kullanılıyor!");setLoading(false);return}
+            er.players.push({name:in1,points:0,role:null,guess:null});
+            await database.ref(`rooms/${c}`).set(er);
+            setRc(c);setPn(in1);setS('lobby');
+        }catch(e){alert("Hata!")}
+        setLoading(false);
+    };
+
+    // OYUNCU ÇIKAR (sadece host)
+    const kickPlayer=async(playerName)=>{
+        if(!ih||!database||!rc)return;
+        const updated=rm.players.filter(p=>p.name!==playerName);
+        await database.ref(`rooms/${rc}/players`).set(updated);
+    };
+
+    // İMPOSTOR SAYISI GÜNCELLE
+    const updateImpCount=async(count)=>{
+        setImpCount(count);
+        if(database&&rc)await database.ref(`rooms/${rc}/impCount`).set(count);
+    };
+
+    const sg=async()=>{
+        if(!sc||!rm||!ih)return;
+        const totalPlayers=rm.players.length;
+        const maxImpostors=Math.floor(totalPlayers/2);
+        const actualImpCount=Math.min(rm.impCount||impCount,maxImpostors);
+
+        // Tam random karıştır
+        const sh=[...rm.players].sort(()=>Math.random()-0.5);
+        sh.forEach((p,i)=>{
+            p.role=i<actualImpCount?'impostor':'crewmate';
+            p.guess=null;
+        });
+
+        const w=CAT[sc].words[Math.floor(Math.random()*CAT[sc].words.length)];
+        await database.ref(`rooms/${rc}`).set({
+            ...rm,players:sh,gameState:'playing',
+            category:sc,selectedWord:w,winner:null,
+            correctGuessers:null,wrongGuessers:null
+        });
+    };
+
+    const sub=async()=>{
+        if(!g.trim()||hg||!database)return;
+        const idx=rm.players.findIndex(p=>p.name===pn);
+        if(idx===-1||rm.players[idx].role==='impostor')return;
+        await database.ref(`rooms/${rc}/players/${idx}/guess`).set(g.trim());
+        setHg(true);
+    };
+
+    const nr=async()=>{
+        if(!ih||!database)return;
+        const up=rm.players.map(p=>({...p,role:null,guess:null}));
+        await database.ref(`rooms/${rc}`).update({
+            gameState:'lobby',players:up,
+            category:null,selectedWord:null,
+            winner:null,correctGuessers:null,wrongGuessers:null
+        });
+    };
+
+    const st={
+        page:{minHeight:'100vh',background:'linear-gradient(135deg,#667eea,#764ba2)',overflowY:'auto'},
+        inner:{padding:'20px'},
+        card:{background:'rgba(255,255,255,0.1)',backdropFilter:'blur(10px)',borderRadius:'20px',padding:'25px'},
+        input:{width:'100%',padding:'15px',borderRadius:'10px',background:'rgba(255,255,255,0.2)',color:'white',border:'2px solid rgba(255,255,255,0.3)',outline:'none',fontSize:'16px',boxSizing:'border-box'},
+        btn:(bg,dis)=>({width:'100%',background:dis?'rgba(100,100,100,0.5)':bg,color:'white',fontWeight:'bold',padding:'15px',borderRadius:'10px',border:'none',cursor:dis?'not-allowed':'pointer',fontSize:'16px',opacity:dis?.6:1}),
+        label:{color:'rgba(255,255,255,0.6)',fontSize:'13px',marginBottom:'6px'},
+        white:{color:'white',fontWeight:'600'},
+        yellow:{color:'rgb(253,224,71)',fontWeight:'bold'}
+    };
+
+    // Puanlama kuralları paneli (küçük)
+    const ScorePanel=()=>(
+        <div style={{background:'rgba(0,0,0,0.25)',borderRadius:'12px',padding:'12px',marginBottom:'15px'}}>
+            <p style={{color:'rgb(253,224,71)',fontWeight:'bold',fontSize:'13px',margin:'0 0 8px 0'}}>📊 Puan Tablosu</p>
+            {SCORE_RULES.map((r,i)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',marginBottom:'3px'}}>
+                    <span style={{color:'rgba(255,255,255,0.7)',fontSize:'12px'}}>{r.text}</span>
+                    <span style={{color:r.pts.startsWith('+')?'rgb(74,222,128)':'rgb(239,68,68)',fontWeight:'bold',fontSize:'12px'}}>{r.pts}</span>
+                </div>
+            ))}
+        </div>
+    );
+
+    if(s==='menu'){return(
+        <div style={st.page}>
+            <ScoreTicker/>
+            <div style={{...st.inner,display:'flex',alignItems:'center',justifyContent:'center',minHeight:'calc(100vh - 37px)'}}>
+                <div style={{...st.card,maxWidth:'400px',width:'100%'}}>
+                    <h1 style={{fontSize:'40px',fontWeight:'bold',color:'white',textAlign:'center',margin:'0 0 8px 0'}}>🎭 Kim İmpostor?</h1>
+                    <p style={{color:'rgba(255,255,255,0.5)',textAlign:'center',margin:'0 0 20px 0',fontSize:'13px'}}>Çok oyunculu gizem oyunu</p>
+                    <ScorePanel/>
+                    {!database&&<div style={{background:'rgba(239,68,68,0.2)',border:'2px solid red',borderRadius:'10px',padding:'12px',marginBottom:'15px'}}><p style={{color:'#fca5a5',margin:0,fontSize:'13px'}}>⚠️ Firebase bağlantısı yok!</p></div>}
+                    <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+                        <input type="text" placeholder="İsminizi Girin" value={in1} onChange={e=>setIn(e.target.value)} onKeyDown={e=>e.key==='Enter'&&cr()} style={st.input} maxLength={20}/>
+                        <button onClick={cr} disabled={!in1.trim()||!database||loading} style={st.btn('linear-gradient(90deg,rgb(239,68,68),rgb(236,72,153))',!in1.trim()||!database||loading)}>
+                            {loading?'Bağlanıyor...':'🏠 Oda Oluştur'}
+                        </button>
+                        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                            <div style={{flex:1,borderTop:'1px solid rgba(255,255,255,0.3)'}}></div>
+                            <span style={{color:'rgba(255,255,255,0.5)',fontSize:'13px'}}>VEYA</span>
+                            <div style={{flex:1,borderTop:'1px solid rgba(255,255,255,0.3)'}}></div>
+                        </div>
+                        <input type="text" placeholder="Oda Kodunu Girin" value={irc} onChange={e=>setIrc(e.target.value.toUpperCase())} style={{...st.input,textTransform:'uppercase'}} maxLength={6}/>
+                        <button onClick={jr} disabled={!in1.trim()||!irc.trim()||!database||loading} style={st.btn('linear-gradient(90deg,rgb(59,130,246),rgb(6,182,212))',!in1.trim()||!irc.trim()||!database||loading)}>
+                            {loading?'Bağlanıyor...':'🚪 Odaya Katıl'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )}
+
+    if(s==='lobby'){
+        const currentImpCount=rm?.impCount||1;
+        return(
+            <div style={st.page}>
+                <ScoreTicker/>
+                <div style={st.inner}>
+                    <div style={{maxWidth:'600px',margin:'0 auto'}}>
+                        <div style={{...st.card,textAlign:'center',marginBottom:'15px'}}>
+                            <p style={st.label}>Oda Kodu - Arkadaşlarınızla paylaşın</p>
+                            <p style={{color:'rgb(253,224,71)',fontFamily:'monospace',fontWeight:'bold',fontSize:'44px',margin:0,letterSpacing:'10px'}}>{rc}</p>
+                        </div>
+
+                        {/* İMPOSTOR SAYISI SEÇİMİ - SADECE HOST */}
+                        {ih&&(
+                            <div style={{...st.card,marginBottom:'15px'}}>
+                                <h3 style={{...st.white,margin:'0 0 12px 0'}}>🎭 İmpostor Sayısı</h3>
+                                <div style={{display:'flex',gap:'10px'}}>
+                                    {[1,2,3].map(n=>(
+                                        <button key={n} onClick={()=>updateImpCount(n)}
+                                            style={{flex:1,padding:'15px',borderRadius:'12px',fontSize:'20px',fontWeight:'bold',
+                                                border:currentImpCount===n?'3px solid rgb(253,224,71)':'2px solid rgba(255,255,255,0.2)',
+                                                background:currentImpCount===n?'rgba(239,68,68,0.4)':'rgba(255,255,255,0.1)',
+                                                color:'white',cursor:'pointer'}}>
+                                            {n}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p style={{color:'rgba(255,255,255,0.4)',fontSize:'11px',margin:'8px 0 0 0',textAlign:'center'}}>
+                                    Min. {currentImpCount*2+1} oyuncu gerekli
+                                </p>
+                            </div>
+                        )}
+                        {!ih&&rm?.impCount&&(
+                            <div style={{...st.card,marginBottom:'15px',textAlign:'center'}}>
+                                <p style={{color:'rgba(255,255,255,0.6)',margin:0,fontSize:'14px'}}>
+                                    🎭 Bu turda <span style={{color:'rgb(239,68,68)',fontWeight:'bold'}}>{rm.impCount}</span> impostor olacak
+                                </p>
+                            </div>
+                        )}
+
+                        {/* OYUNCULAR */}
+                        <div style={{...st.card,marginBottom:'15px'}}>
+                            <h3 style={{...st.white,margin:'0 0 12px 0'}}>👥 Oyuncular ({rm?.players?.length||0}/30)</h3>
+                            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                                {rm?.players?.map((p,i)=>(
+                                    <div key={i} style={{background:'rgba(255,255,255,0.15)',borderRadius:'10px',padding:'12px 15px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                                        <span style={st.white}>{p.name}{p.name===rm.host?' 👑':''}{p.name===pn?' (Sen)':''}</span>
+                                        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                                            <span style={st.yellow}>{p.points} pts</span>
+                                            {/* OYUNCU ÇIKAR - sadece host, kendisini çıkaramaz */}
+                                            {ih&&p.name!==pn&&(
+                                                <button onClick={()=>kickPlayer(p.name)}
+                                                    style={{background:'rgba(239,68,68,0.4)',border:'1px solid rgba(239,68,68,0.6)',borderRadius:'6px',color:'white',padding:'4px 8px',fontSize:'12px',cursor:'pointer'}}>
+                                                    ✕ Çıkar
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* KATEGORİ SEÇİMİ */}
+                        {ih&&(
+                            <div style={{...st.card,marginBottom:'15px'}}>
+                                <h3 style={{...st.white,margin:'0 0 12px 0'}}>📂 Kategori Seçin</h3>
+                                <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px'}}>
+                                    {Object.keys(CAT).map(k=>(
+                                        <button key={k} onClick={()=>setSc(k)} style={{padding:'12px',borderRadius:'10px',background:sc===k?'linear-gradient(90deg,rgb(34,197,94),rgb(20,184,166))':'rgba(255,255,255,0.15)',border:sc===k?'2px solid white':'2px solid rgba(255,255,255,0.2)',color:'white',fontWeight:'600',cursor:'pointer',fontSize:'13px'}}>
+                                            {CAT[k].name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {ih&&sc&&<button onClick={sg}
+                            disabled={!rm?.players||rm.players.length<(currentImpCount*2+1)}
+                            style={st.btn('linear-gradient(90deg,rgb(34,197,94),rgb(5,150,105))',!rm?.players||rm.players.length<(currentImpCount*2+1))}>
+                            🎮 Oyunu Başlat
+                        </button>}
+                        {ih&&!sc&&<p style={{color:'rgba(255,255,255,0.5)',textAlign:'center',fontSize:'13px'}}>↑ Önce bir kategori seçin</p>}
+                        {!ih&&<div style={{textAlign:'center',color:'rgba(255,255,255,0.5)',padding:'20px'}} className="pulse">⏳ Oda sahibi oyunu başlatması bekleniyor...</div>}
+
+                        <ScorePanel/>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    if(s==='game'){
+        const cms=rm?.players?.filter(p=>p.role==='crewmate')||[];
+        const impostors=rm?.players?.filter(p=>p.role==='impostor')||[];
+        const gc=cms.filter(p=>p.guess!==null&&p.guess!==undefined).length;
+
+        // Oyuncu listesini random sırada göster
+        const orderedPlayers=displayOrder.length>0
+            ?displayOrder.map(name=>rm.players.find(p=>p.name===name)).filter(Boolean)
+            :rm?.players||[];
+
+        return(
+            <div style={st.page}>
+                <ScoreTicker/>
+                <div style={st.inner}>
+                    <div style={{maxWidth:'600px',margin:'0 auto'}}>
+                        {/* ROL KARTI */}
+                        <div style={{...st.card,textAlign:'center',marginBottom:'15px'}}>
+                            <p style={{...st.label,marginBottom:'10px'}}>Senin Rolün</p>
+                            <div style={{fontSize:'50px',fontWeight:'900',color:mr==='impostor'?'rgb(239,68,68)':'rgb(96,165,250)',marginBottom:'15px'}}>
+                                {mr==='impostor'?'🎭 İMPOSTOR':'✅ TEMİZ'}
+                            </div>
+                            {mr==='crewmate'&&rm?.selectedWord&&(
+                                <div>
+                                    <p style={st.label}>Kategori Kelimesi</p>
+                                    <div style={{background:'rgba(96,165,250,0.25)',border:'2px solid rgb(96,165,250)',borderRadius:'12px',padding:'15px',marginBottom:'8px'}}>
+                                        <p style={{color:'rgb(253,224,71)',fontWeight:'bold',fontSize:'34px',margin:0}}>{rm.selectedWord}</p>
+                                    </div>
+                                    <p style={{color:'rgba(255,255,255,0.4)',fontSize:'11px',margin:0}}>İmpostor bu kelimeyi bilmiyor!</p>
+                                </div>
+                            )}
+                            {mr==='impostor'&&(
+                                <div>
+                                    <div style={{background:'rgba(239,68,68,0.15)',border:'2px solid rgba(239,68,68,0.4)',borderRadius:'12px',padding:'15px',marginBottom:'10px'}}>
+                                        <p style={{color:'rgba(255,255,255,0.7)',fontSize:'14px',margin:'0 0 4px 0'}}>⚠️ Kategori kelimesini bilmiyorsun!</p>
+                                        <p style={{color:'rgba(255,255,255,0.4)',fontSize:'12px',margin:0}}>Diğerleri tartışırken yakalanma!</p>
+                                    </div>
+                                    {/* Birden fazla impostor varsa diğer impostorları göster */}
+                                    {impostors.length>1&&(
+                                        <div style={{background:'rgba(239,68,68,0.1)',borderRadius:'10px',padding:'10px'}}>
+                                            <p style={{color:'rgba(255,255,255,0.6)',fontSize:'12px',margin:'0 0 6px 0'}}>Diğer impostorlar:</p>
+                                            <div style={{display:'flex',flexWrap:'wrap',gap:'6px',justifyContent:'center'}}>
+                                                {impostors.filter(imp=>imp.name!==pn).map((imp,i)=>(
+                                                    <span key={i} style={{background:'rgba(239,68,68,0.3)',padding:'4px 10px',borderRadius:'8px',color:'white',fontSize:'13px',fontWeight:'bold'}}>🎭 {imp.name}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* TEMİZ → TAHMİN */}
+                        {mr==='crewmate'&&(
+                            <div style={{...st.card,marginBottom:'15px'}}>
+                                <h3 style={{...st.white,margin:'0 0 15px 0'}}>🔍 İmpostoru Tahmin Et</h3>
+                                {!hg?(
+                                    <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+                                        <input type="text" value={g} onChange={e=>setG(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sub()} placeholder="Kimin impostor olduğunu yaz..." style={st.input}/>
+                                        <button onClick={sub} disabled={!g.trim()} style={st.btn('linear-gradient(90deg,rgb(168,85,247),rgb(236,72,153))',!g.trim())}>✉️ Tahmini Gönder</button>
+                                    </div>
+                                ):(
+                                    <div style={{background:'rgba(34,197,94,0.15)',border:'2px solid rgba(34,197,94,0.4)',borderRadius:'10px',padding:'15px',textAlign:'center'}}>
+                                        <p style={{color:'rgb(134,239,172)',fontWeight:'600',fontSize:'16px',margin:'0 0 6px 0'}}>✓ Tahmininiz gönderildi!</p>
+                                        <p style={{color:'rgba(255,255,255,0.7)',margin:0}}>"{g}"</p>
+                                        <p style={{color:'rgba(255,255,255,0.4)',fontSize:'12px',margin:'8px 0 0 0'}} className="pulse">⏳ Diğerleri bekleniyor... ({gc}/{cms.length})</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* İMPOSTOR → BEKLİYOR */}
+                        {mr==='impostor'&&(
+                            <div style={{...st.card,marginBottom:'15px',textAlign:'center'}}>
+                                <p style={{color:'rgba(255,255,255,0.6)',margin:0}} className="pulse">⏳ Oyuncuların tahmin etmesi bekleniyor... ({gc}/{cms.length})</p>
+                            </div>
+                        )}
+
+                        {/* OYUNCU LİSTESİ - RANDOM SIRADA, SADECE İSİMLER */}
+                        <div style={st.card}>
+                            <h3 style={{...st.white,margin:'0 0 5px 0'}}>👥 Oyuncular</h3>
+                            <p style={{color:'rgba(255,255,255,0.4)',fontSize:'12px',margin:'0 0 12px 0'}}>{gc}/{cms.length} kişi tahminini gönderdi</p>
+                            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                                {orderedPlayers.map((p,i)=>{
+                                    const isMe=p.name===pn;
+                                    const showMyStatus=isMe&&p.role==='crewmate';
+                                    return(
+                                        <div key={i} style={{
+                                            background:isMe?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.15)',
+                                            borderRadius:'10px',padding:'12px 15px',
+                                            display:'flex',alignItems:'center',justifyContent:'space-between',
+                                            border:isMe?'1px solid rgba(255,255,255,0.4)':'none'
+                                        }}>
+                                            <span style={{color:'white',fontWeight:'600'}}>{p.name}{isMe?' (Sen)':''}</span>
+                                            {showMyStatus&&(
+                                                hg
+                                                    ?<span style={{fontSize:'12px',color:'rgb(74,222,128)'}}>✓ Gönderildi</span>
+                                                    :<span style={{fontSize:'12px',color:'rgb(250,204,21)'}} className="pulse">⏳ Tahmin et</span>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    if(s==='results'){
+        const impostors=rm?.players?.filter(p=>p.role==='impostor')||[];
+        const sp=[...(rm?.players||[])].sort((a,b)=>b.points-a.points);
+        const solo=(rm?.correctGuessers?.length===1);
+        return(
+            <div style={st.page}>
+                <ScoreTicker/>
+                <div style={st.inner}>
+                    <div style={{maxWidth:'700px',margin:'0 auto'}}>
+                        {/* KAZANAN */}
+                        <div style={{...st.card,textAlign:'center',marginBottom:'15px'}}>
+                            <h2 style={{fontSize:'28px',fontWeight:'bold',color:'white',margin:'0 0 12px 0'}}>🏆 Sonuçlar</h2>
+                            <div style={{fontSize:'34px',fontWeight:'900',color:rm?.winner==='impostor'?'rgb(239,68,68)':'rgb(74,222,128)',marginBottom:'15px'}}>
+                                {rm?.winner==='impostor'?'İmpostor Kazandı! 🎭':'Temizler Kazandı! ⭐'}
+                            </div>
+                            {rm?.selectedWord&&(
+                                <div style={{marginBottom:'15px'}}>
+                                    <p style={st.label}>Kelime</p>
+                                    <p style={{...st.yellow,fontSize:'30px',margin:0}}>{rm.selectedWord}</p>
+                                </div>
+                            )}
+                            <div style={{background:'rgba(255,255,255,0.15)',borderRadius:'12px',padding:'15px',display:'inline-block'}}>
+                                <p style={{color:'rgba(255,255,255,0.7)',margin:'0 0 8px 0',fontSize:'13px'}}>İmpostor{impostors.length>1?'lar':''}:</p>
+                                <div style={{display:'flex',gap:'8px',flexWrap:'wrap',justifyContent:'center'}}>
+                                    {impostors.map((imp,i)=>(
+                                        <span key={i} style={{background:'rgb(239,68,68)',padding:'8px 20px',borderRadius:'20px',color:'white',fontWeight:'bold',fontSize:'16px'}}>🎭 {imp.name}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* DOĞRU TAHMİN */}
+                        {rm?.correctGuessers&&rm.correctGuessers.length>0&&(
+                            <div style={{background:'rgba(34,197,94,0.15)',border:'2px solid rgba(34,197,94,0.4)',borderRadius:'15px',padding:'18px',marginBottom:'15px'}}>
+                                <h3 style={{color:'rgb(134,239,172)',margin:'0 0 10px 0',fontSize:'16px'}}>
+                                    🎯 {solo?'Tek başına buldu! (+5 puan)':'Doğru tahmin (+2 puan):'}
+                                </h3>
+                                <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                                    {rm.correctGuessers.map((n,i)=>(
+                                        <span key={i} style={{background:'rgba(34,197,94,0.35)',padding:'6px 14px',borderRadius:'8px',color:'white',fontWeight:'600',fontSize:'14px'}}>✓ {n} {solo?'(+5)':'(+2)'}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* YANLIŞ TAHMİN */}
+                        {rm?.wrongGuessers&&rm.wrongGuessers.length>0&&(
+                            <div style={{background:'rgba(239,68,68,0.1)',border:'2px solid rgba(239,68,68,0.3)',borderRadius:'15px',padding:'18px',marginBottom:'15px'}}>
+                                <h3 style={{color:'rgb(252,165,165)',margin:'0 0 10px 0',fontSize:'16px'}}>❌ Yanlış tahmin (-2 puan):</h3>
+                                <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                                    {rm.wrongGuessers.map((n,i)=>(
+                                        <span key={i} style={{background:'rgba(239,68,68,0.25)',padding:'6px 14px',borderRadius:'8px',color:'white',fontWeight:'600',fontSize:'14px'}}>✗ {n} (-2)</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* SKOR TABLOSU */}
+                        <div style={{...st.card,marginBottom:'15px'}}>
+                            <h3 style={{...st.white,margin:'0 0 12px 0',fontSize:'20px'}}>🏅 Skor Tablosu</h3>
+                            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                                {sp.map((p,i)=>(
+                                    <div key={i} style={{borderRadius:'10px',padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',background:i===0?'rgba(234,179,8,0.3)':i===1?'rgba(156,163,175,0.2)':i===2?'rgba(249,115,22,0.2)':'rgba(255,255,255,0.15)',border:i===0?'2px solid rgb(234,179,8)':i===1?'1px solid rgb(209,213,219)':i===2?'1px solid rgb(249,115,22)':'none'}}>
+                                        <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+                                            <span style={{fontSize:'20px'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`}</span>
+                                            <span style={{color:'white',fontWeight:'bold'}}>{p.name}{p.name===pn?' (Sen)':''}</span>
+                                            {p.role==='impostor'&&<span style={{background:'rgba(239,68,68,0.5)',padding:'2px 8px',borderRadius:'8px',color:'white',fontSize:'11px'}}>🎭 İmpostor</span>}
+                                        </div>
+                                        <span style={{fontSize:'20px',fontWeight:'bold',color:'rgb(253,224,71)'}}>{p.points}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* YENİ TUR */}
+                        {ih?(
+                            <button onClick={nr} style={st.btn('linear-gradient(90deg,rgb(59,130,246),rgb(6,182,212))',false)}>
+                                🔄 Yeni Tur Başlat
+                            </button>
+                        ):(
+                            <div style={{...st.card,textAlign:'center'}}>
+                                <p style={{color:'rgba(255,255,255,0.6)',margin:0}} className="pulse">⏳ Oda sahibinin yeni tur başlatması bekleniyor...</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )
+    }
+    return null;
+}
+ReactDOM.render(React.createElement(App),document.getElementById('root'));
+</script></body></html>
